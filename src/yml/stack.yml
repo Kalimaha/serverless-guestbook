@@ -3,6 +3,12 @@ Parameters:
   BucketName:
     Description: Name of the bucket that hosts the static front-end
     Type: String
+  DBTableName:
+    Description: Name of the schemaless table
+    Type: String
+  DBTableIndex:
+    Description: Name of the primary index of the schemaless table
+    Type: String
 
 Resources:
 
@@ -10,3 +16,17 @@ Resources:
     Type: "AWS::S3::Bucket"
     Properties:
       BucketName: !Ref BucketName
+
+  DB:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      TableName: !Ref DBTableName
+      AttributeDefinitions:
+        - AttributeName: !Ref DBTableIndex
+          AttributeType: S
+      KeySchema:
+        - AttributeName: !Ref DBTableIndex
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5

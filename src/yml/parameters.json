@@ -2,5 +2,13 @@
   {
     "ParameterKey": "BucketName",
     "ParameterValue": "serverless-guestbook"
+  },
+  {
+    "ParameterKey": "DBTableName",
+    "ParameterValue": "Messages"
+  },
+  {
+    "ParameterKey": "DBTableIndex",
+    "ParameterValue": "MessageID"
   }
 ]

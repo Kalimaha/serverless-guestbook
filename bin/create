@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+aws cloudformation create-stack --stack-name serverless-guestbook \
+                                --template-body file://src/yml/stack.yml \
+                                --parameters file://src/yml/parameters.json \
+                                --region ap-southeast-2 \
+                                --capabilities CAPABILITY_IAM
