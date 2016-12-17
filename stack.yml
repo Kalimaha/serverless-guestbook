@@ -4,6 +4,23 @@ Resources:
     Type: "AWS::S3::Bucket"
     Properties:
       BucketName: serverless-guestbook
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+
+  S3BucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadForGetBucketObjects
+            Effect: Allow
+            Principal: "*"
+            Resource:
+              - "arn:aws:s3:::serverless-guestbook/*"
+            Action:
+              - "s3:GetObject"
 
   LambdaPopulateS3:
     Type: "AWS::Lambda::Function"
@@ -59,7 +76,9 @@ Resources:
             response = s3_client.put_object(
               Body=body,
               Bucket='serverless-guestbook',
-              Key='index.html'
+              Key='index.html',
+              ContentType='text/html',
+              ContentLanguage='html'
             )
             return response
 
