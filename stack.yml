@@ -1,31 +1,19 @@
-Parameters:
-
-  BucketName:
-    Description: Name of the bucket that hosts the static front-end
-    Type: String
-  DBTableName:
-    Description: Name of the schemaless table
-    Type: String
-  DBTableIndex:
-    Description: Name of the primary index of the schemaless table
-    Type: String
-
 Resources:
 
   S3Bucket:
     Type: "AWS::S3::Bucket"
     Properties:
-      BucketName: !Ref BucketName
+      BucketName: serverless-guestbook
 
   DB:
     Type: "AWS::DynamoDB::Table"
     Properties:
-      TableName: !Ref DBTableName
+      TableName: Messages
       AttributeDefinitions:
-        - AttributeName: !Ref DBTableIndex
+        - AttributeName: MessageID
           AttributeType: S
       KeySchema:
-        - AttributeName: !Ref DBTableIndex
+        - AttributeName: MessageID
           KeyType: HASH
       ProvisionedThroughput:
         ReadCapacityUnits: 5
