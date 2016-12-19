@@ -34,39 +34,15 @@ Resources:
       FunctionName: PopulateS3
       Handler: index.handler
       Role: !GetAtt [ LambdaFunctionRole, Arn ]
-      Runtime: python2.7
+      Runtime: nodejs4.3
       Code:
         ZipFile: >
-          import boto3, json
+          var awsSdk = require('aws-sdk');
+          var response = require('cfn-response');
 
-          from botocore.vendored import requests
-
-          def send(event, context, responseStatus, responseData, physicalResourceId):
-            responseUrl = event['ResponseURL']
-            responseBody = {}
-            responseBody['Status'] = responseStatus
-            responseBody['Reason'] = 'See the details in CloudWatch Log Stream: ' + context.log_stream_name
-            responseBody['PhysicalResourceId'] = physicalResourceId or context.log_stream_name
-            responseBody['StackId'] = event['StackId']
-            responseBody['RequestId'] = event['RequestId']
-            responseBody['LogicalResourceId'] = event['LogicalResourceId']
-            responseBody['Data'] = responseData
-            json_responseBody = json.dumps(responseBody)
-            headers = {
-              'content-type' : '',
-              'content-length' : str(len(json_responseBody))
-            }
-            try:
-              response = requests.put(responseUrl,
-                                      data=json_responseBody,
-                                      headers=headers)
-            except Exception as e:
-              print "send(..) failed executing requests.put(..): " + str(e)
-
-
-          def handler(event, context):
-            s3_client = boto3.client('s3')
-            body = """
+          exports.handler = function(event, context) {
+            var s3 = new awsSdk.S3()
+            var html = `
               <html>
                 <head>
                   <title>Serverless Guestbook</title>
@@ -75,7 +51,7 @@ Resources:
                     const get_url   = "http://jsonplaceholder.typicode.com/users"
                     const post_url  = "http://jsonplaceholder.typicode.com/posts"
                     const list_messages = (messages) => { for (m of messages) $("#list").append(format(m)) }
-                    const format = (m) => `<li>${m.message}<br><small>posted by ${m.author} on ${m.date}</small></li>`
+                    const format = (m) => '<li>' + m.message + '<br><small>posted by ' + m.author + ' on ' + m.date + '</small></li>'
                     const load_messages = () => $.get({ url: get_url }).then((messages) => list_messages(messages))
                     const form_is_valid = () => $("#m").val().length > 0 && $("#a").val().length > 0
                     const post_message = () => {
@@ -104,15 +80,19 @@ Resources:
                   <hr>
                 </body>
               </html>
-            """
-            response = s3_client.put_object(
-              Body=body,
-              Bucket='serverless-guestbook',
-              Key='index.html',
-              ContentType='text/html',
-              ContentLanguage='html'
-            )
-            send(event, context, "SUCCESS", response, "CustomResourcePhysicalID")
+            `
+            var params = {
+              Body: html,
+              Bucket: 'serverless-guestbook',
+              Key: 'index.html',
+              ContentType: 'text/html',
+              ContentLanguage: 'html'
+            }
+            s3.putObject(params, function(err, data) {
+              if (err) response.send(event, context, response.FAILURE, data)
+              else     response.send(event, context, response.SUCCESS, data)
+            })
+          }
 
   DB:
     Type: "AWS::DynamoDB::Table"
