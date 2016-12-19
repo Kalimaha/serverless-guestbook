@@ -22,28 +22,36 @@ Resources:
             Action:
               - "s3:GetObject"
 
+  CustomResourcePopulateS3:
+    Type: "Custom::PopulateS3"
+    Version: 1.0
+    Properties:
+      ServiceToken: !GetAtt [ LambdaPopulateS3, Arn ]
+
   LambdaPopulateS3:
     Type: "AWS::Lambda::Function"
     Properties:
       FunctionName: PopulateS3
       Handler: index.handler
       Role: !GetAtt [ LambdaFunctionRole, Arn ]
-      Runtime: python2.7
+      Runtime: nodejs4.3
       Code:
         ZipFile: >
-          import boto3
+          var awsSdk = require('aws-sdk');
+          var response = require('cfn-response');
 
-          def handler(event, context):
-            s3_client = boto3.client('s3')
-            body = """
+          exports.handler = function(event, context) {
+            var s3 = new awsSdk.S3()
+            var html = `
               <html>
                 <head>
+                  <title>Serverless Guestbook</title>
                   <script type="text/javascript" src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
                   <script type="text/javascript">
                     const get_url   = "http://jsonplaceholder.typicode.com/users"
                     const post_url  = "http://jsonplaceholder.typicode.com/posts"
                     const list_messages = (messages) => { for (m of messages) $("#list").append(format(m)) }
-                    const format = (m) => `<li>${m.message}<br><small>posted by ${m.author} on ${m.date}</small></li>`
+                    const format = (m) => '<li>' + m.message + '<br><small>posted by ' + m.author + ' on ' + m.date + '</small></li>'
                     const load_messages = () => $.get({ url: get_url }).then((messages) => list_messages(messages))
                     const form_is_valid = () => $("#m").val().length > 0 && $("#a").val().length > 0
                     const post_message = () => {
@@ -72,15 +80,19 @@ Resources:
                   <hr>
                 </body>
               </html>
-            """
-            response = s3_client.put_object(
-              Body=body,
-              Bucket='serverless-guestbook',
-              Key='index.html',
-              ContentType='text/html',
-              ContentLanguage='html'
-            )
-            return response
+            `
+            var params = {
+              Body: html,
+              Bucket: 'serverless-guestbook',
+              Key: 'index.html',
+              ContentType: 'text/html',
+              ContentLanguage: 'html'
+            }
+            s3.putObject(params, function(err, data) {
+              if (err) response.send(event, context, response.FAILURE, data)
+              else     response.send(event, context, response.SUCCESS, data)
+            })
+          }
 
   DB:
     Type: "AWS::DynamoDB::Table"
