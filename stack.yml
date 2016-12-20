@@ -213,3 +213,37 @@ Resources:
               - "/invocations"
       ResourceId: !GetAtt [ APIGateway, "RootResourceId" ]
       RestApiId: !Ref APIGateway
+
+  APIDeployment:
+    Type: "AWS::ApiGateway::Deployment"
+    DependsOn: GetMessagesREST
+    Properties:
+      RestApiId: !Ref APIGateway
+      StageName: serverlessguestbookdeployment
+
+  APIStage:
+    Type: "AWS::ApiGateway::Stage"
+    Properties:
+      DeploymentId: !Ref APIDeployment
+      RestApiId: !Ref APIGateway
+      StageName: serverlessguestbook
+
+  APIAccount:
+    Type: "AWS::ApiGateway::Account"
+    Properties:
+      CloudWatchRoleArn: !GetAtt [ CloudWatchRole, Arn ]
+
+  CloudWatchRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+       Version: "2012-10-17"
+       Statement:
+        - Effect: Allow
+          Principal:
+           Service:
+            - "apigateway.amazonaws.com"
+          Action: "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+       - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
