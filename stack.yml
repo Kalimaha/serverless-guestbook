@@ -204,7 +204,7 @@ Resources:
         IntegrationHttpMethod: POST
         IntegrationResponses:
           - StatusCode: 200
-        Type: AWS_PROXY
+        Type: AWS
         PassthroughBehavior: WHEN_NO_MATCH
         Uri:
           !Join
