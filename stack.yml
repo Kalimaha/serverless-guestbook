@@ -36,63 +36,79 @@ Resources:
       Role: !GetAtt [ LambdaFunctionRole, Arn ]
       Runtime: nodejs4.3
       Code:
-        ZipFile: >
-          var awsSdk = require('aws-sdk');
-          var response = require('cfn-response');
-
-          exports.handler = function(event, context) {
-            var s3 = new awsSdk.S3()
-            var html = `
-              <html>
-                <head>
-                  <title>Serverless Guestbook</title>
-                  <script type="text/javascript" src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
-                  <script type="text/javascript">
-                    const get_url   = "http://jsonplaceholder.typicode.com/users"
-                    const post_url  = "http://jsonplaceholder.typicode.com/posts"
-                    const list_messages = (messages) => { for (m of messages) $("#list").append(format(m)) }
-                    const format = (m) => '<li>' + m.message + '<br><small>posted by ' + m.author + ' on ' + m.date + '</small></li>'
-                    const load_messages = () => $.get({ url: get_url }).then((messages) => list_messages(messages))
-                    const form_is_valid = () => $("#m").val().length > 0 && $("#a").val().length > 0
-                    const post_message = () => {
-                      if (form_is_valid()) {
-                        $("#list").empty()
-                        $.post({
-                          url:  post_url,
-                          data: { message: $("#m").val(), author: $("#a").val(), date: new Date().toISOString() }
-                        }).then(() => load_messages())
-                      } else alert("Please type a message and the author name!")
-                    }
-                  </script>
-                  <style>
-                    li { margin-bottom: 1rem; }
-                  </style>
-                </head>
-                <body onload="load_messages()">
-                  <hr>
-                  <b>New message: </b>
-                  <input id="m" placeholder="e.g. Hallo, world!">
-                  <b>by </b>
-                  <input id="a" placeholder="e.g. John Doe">
-                  <button onclick="post_message()">Post</button>
-                  <hr>
-                  <ul id="list"></ul>
-                  <hr>
-                </body>
-              </html>
-            `
-            var params = {
-              Body: html,
-              Bucket: 'serverless-guestbook',
-              Key: 'index.html',
-              ContentType: 'text/html',
-              ContentLanguage: 'html'
-            }
-            s3.putObject(params, function(err, data) {
-              if (err) response.send(event, context, response.FAILURE, data)
-              else     response.send(event, context, response.SUCCESS, data)
-            })
-          }
+        ZipFile:
+          !Join
+            - ""
+            -
+              - "var awsSdk = require('aws-sdk'); \n"
+              - "var response = require('cfn-response'); \n"
+              - "exports.handler = function(event, context) { \n"
+              - "  var s3 = new awsSdk.S3() \n"
+              - "  var html = ` \n"
+              - "    <html> \n"
+              - "      <head> \n"
+              - "        <title>Serverless Guestbook</title> \n"
+              - "        <script type='text/javascript' src='https://code.jquery.com/jquery-3.1.1.min.js'></script> \n"
+              - "        <script type='text/javascript'> \n"
+              - "          const get_url   = '"
+              - !Join
+                - ""
+                -
+                  - "https://"
+                  - !Ref APIGateway
+                  - ".execute-api.ap-southeast-2.amazonaws.com/serverlessguestbookdeployment"
+              - "'\n"
+              - "          const post_url  = '"
+              - !Join
+                - ""
+                -
+                  - "https://"
+                  - !Ref APIGateway
+                  - ".execute-api.ap-southeast-2.amazonaws.com/serverlessguestbookdeployment"
+              - "'\n"
+              - "          const list_messages = (messages) => { for (m of messages) $('#list').append(format(m)) } \n"
+              - "          const format = (m) => '<li>' + m.message + '<br><small>posted by ' + m.author + ' on ' + m.date + '</small></li>' \n"
+              - "          const load_messages = () => $.get({ url: get_url }).then((messages) => list_messages(messages)) \n"
+              - "          const form_is_valid = () => $('#m').val().length > 0 && $('#a').val().length > 0 \n"
+              - "          const post_message = () => { \n"
+              - "            if (form_is_valid()) { \n"
+              - "              $('#list').empty() \n"
+              - "              $.post({ \n"
+              - "                url:  post_url, \n"
+              - "                data: { message: $('#m').val(), author: $('#a').val(), date: new Date().toISOString() } \n"
+              - "              }).then(() => load_messages()) \n"
+              - "            } else alert('Please type a message and the author name!') \n"
+              - "          } \n"
+              - "        </script> \n"
+              - "        <style> \n"
+              - "          li { margin-bottom: 1rem; } \n"
+              - "        </style> \n"
+              - "      </head> \n"
+              - "      <body onload='load_messages()'> \n"
+              - "        <hr> \n"
+              - "        <b>New message: </b> \n"
+              - "        <input id='m' placeholder='e.g. Hallo, world!'> \n"
+              - "        <b>by </b> \n"
+              - "        <input id='a' placeholder='e.g. John Doe'> \n"
+              - "        <button onclick='post_message()'>Post</button> \n"
+              - "        <hr> \n"
+              - "        <ul id='list'></ul> \n"
+              - "        <hr> \n"
+              - "      </body> \n"
+              - "    </html> \n"
+              - "  ` \n"
+              - "  var params = { \n"
+              - "    Body: html, \n"
+              - "    Bucket: 'serverless-guestbook', \n"
+              - "    Key: 'index.html', \n"
+              - "    ContentType: 'text/html', \n"
+              - "    ContentLanguage: 'html' \n"
+              - "  } \n"
+              - "  s3.putObject(params, function(err, data) { \n"
+              - "    if (err) response.send(event, context, response.FAILURE, data) \n"
+              - "    else     response.send(event, context, response.SUCCESS, data) \n"
+              - "  }) \n"
+              - "} \n"
 
   DB:
     Type: "AWS::DynamoDB::Table"
