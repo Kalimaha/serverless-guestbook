@@ -162,3 +162,54 @@ Resources:
                 Resource: "*"
                 Action:
                   - "s3:*"
+
+  APIGateway:
+    Type: "AWS::ApiGateway::RestApi"
+    Properties:
+      Name: serverless-guestbook-gateway
+
+  APIGatewayRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: [ "sts:AssumeRole" ]
+            Effect: Allow
+            Principal:
+              Service: [ "apigateway.amazonaws.com" ]
+      Path: "/"
+      Policies:
+        - PolicyName: PermitLambdaAndLog
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [ "lambda:InvokeFunction" ]
+                Resource: [ "*" ]
+              - Effect: Allow
+                Action: [ "logs:*" ]
+                Resource: "arn:aws:logs:*:*:*"
+              - Effect: Allow
+                Resource: "*"
+                Action: [ "dynamodb:*" ]
+
+  GetMessagesREST:
+    Type: "AWS::ApiGateway::Method"
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        Credentials: !GetAtt [ APIGatewayRole, Arn ]
+        IntegrationHttpMethod: POST
+        Type: AWS
+        PassthroughBehavior: WHEN_NO_TEMPLATES
+        Uri:
+          !Join
+            - ""
+            -
+              - "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/"
+              - !GetAtt [ LambdaGet, Arn ]
+              - "/invocations"
+      ResourceId: !GetAtt [ APIGateway, "RootResourceId" ]
+      RestApiId: !Ref APIGateway
