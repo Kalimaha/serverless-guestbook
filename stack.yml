@@ -202,8 +202,10 @@ Resources:
       Integration:
         Credentials: !GetAtt [ APIGatewayRole, Arn ]
         IntegrationHttpMethod: POST
-        Type: AWS
-        PassthroughBehavior: WHEN_NO_TEMPLATES
+        IntegrationResponses:
+          - StatusCode: 200
+        Type: AWS_PROXY
+        PassthroughBehavior: WHEN_NO_MATCH
         Uri:
           !Join
             - ""
@@ -211,6 +213,8 @@ Resources:
               - "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/"
               - !GetAtt [ LambdaGet, Arn ]
               - "/invocations"
+      MethodResponses:
+      - StatusCode: 200
       ResourceId: !GetAtt [ APIGateway, "RootResourceId" ]
       RestApiId: !Ref APIGateway
 
