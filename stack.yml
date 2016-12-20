@@ -162,3 +162,92 @@ Resources:
                 Resource: "*"
                 Action:
                   - "s3:*"
+
+  APIGateway:
+    Type: "AWS::ApiGateway::RestApi"
+    Properties:
+      Name: serverless-guestbook-gateway
+
+  APIGatewayRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: [ "sts:AssumeRole" ]
+            Effect: Allow
+            Principal:
+              Service: [ "apigateway.amazonaws.com" ]
+      Path: "/"
+      Policies:
+        - PolicyName: PermitLambdaAndLog
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [ "lambda:InvokeFunction" ]
+                Resource: [ "*" ]
+              - Effect: Allow
+                Action: [ "logs:*" ]
+                Resource: "arn:aws:logs:*:*:*"
+              - Effect: Allow
+                Resource: "*"
+                Action: [ "dynamodb:*" ]
+
+  GetMessagesREST:
+    Type: "AWS::ApiGateway::Method"
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        Credentials: !GetAtt [ APIGatewayRole, Arn ]
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - StatusCode: 200
+        Type: AWS_PROXY
+        PassthroughBehavior: WHEN_NO_MATCH
+        Uri:
+          !Join
+            - ""
+            -
+              - "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/"
+              - !GetAtt [ LambdaGet, Arn ]
+              - "/invocations"
+      MethodResponses:
+      - StatusCode: 200
+      ResourceId: !GetAtt [ APIGateway, "RootResourceId" ]
+      RestApiId: !Ref APIGateway
+
+  APIDeployment:
+    Type: "AWS::ApiGateway::Deployment"
+    DependsOn: GetMessagesREST
+    Properties:
+      RestApiId: !Ref APIGateway
+      StageName: serverlessguestbookdeployment
+
+  APIStage:
+    Type: "AWS::ApiGateway::Stage"
+    Properties:
+      DeploymentId: !Ref APIDeployment
+      RestApiId: !Ref APIGateway
+      StageName: serverlessguestbook
+
+  APIAccount:
+    Type: "AWS::ApiGateway::Account"
+    Properties:
+      CloudWatchRoleArn: !GetAtt [ CloudWatchRole, Arn ]
+
+  CloudWatchRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+       Version: "2012-10-17"
+       Statement:
+        - Effect: Allow
+          Principal:
+           Service:
+            - "apigateway.amazonaws.com"
+          Action: "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+       - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
