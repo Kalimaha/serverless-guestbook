@@ -220,6 +220,10 @@ Resources:
         IntegrationHttpMethod: POST
         IntegrationResponses:
           - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
         Type: AWS
         PassthroughBehavior: WHEN_NO_MATCH
         Uri:
@@ -231,6 +235,10 @@ Resources:
               - "/invocations"
       MethodResponses:
       - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
       ResourceId: !GetAtt [ APIGateway, "RootResourceId" ]
       RestApiId: !Ref APIGateway
 
