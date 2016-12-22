@@ -75,7 +75,7 @@ Resources:
               - "              $('#list').empty() \n"
               - "              $.post({ \n"
               - "                url:  post_url, \n"
-              - "                data: { message: $('#m').val(), author: $('#a').val(), date: new Date().toISOString() } \n"
+              - "                data: JSON.stringify({ message: $('#m').val(), author: $('#a').val(), date: new Date().toISOString() }) \n"
               - "              }).then(() => load_messages()) \n"
               - "            } else alert('Please type a message and the author name!') \n"
               - "          } \n"
@@ -164,8 +164,8 @@ Resources:
               TableName = 'Messages',
               Item = {
                 'MessageID':  { 'S': uuid.uuid1().urn },
-                'Message':    { 'S': event['Message'] },
-                'Author':     { 'S': event['Author'] },
+                'Message':    { 'S': event['message'] },
+                'Author':     { 'S': event['author'] },
                 'Date':       { 'S': datetime.datetime.utcnow().isoformat() }
               }
             )
@@ -256,6 +256,38 @@ Resources:
             -
               - "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/"
               - !GetAtt [ LambdaGet, Arn ]
+              - "/invocations"
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+      ResourceId: !GetAtt [ APIGateway, "RootResourceId" ]
+      RestApiId: !Ref APIGateway
+
+  PostMessageREST:
+    Type: "AWS::ApiGateway::Method"
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        Credentials: !GetAtt [ APIGatewayRole, Arn ]
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        Type: AWS
+        PassthroughBehavior: WHEN_NO_MATCH
+        Uri:
+          !Join
+            - ""
+            -
+              - "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/"
+              - !GetAtt [ LambdaPost, Arn ]
               - "/invocations"
       MethodResponses:
       - StatusCode: 200
