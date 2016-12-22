@@ -1,0 +1,277 @@
+Resources:
+
+  S3Bucket:
+    Type: "AWS::S3::Bucket"
+    Properties:
+      BucketName: serverless-guestbook
+      AccessControl: PublicRead
+      WebsiteConfiguration:
+        IndexDocument: index.html
+
+  S3BucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadForGetBucketObjects
+            Effect: Allow
+            Principal: "*"
+            Resource:
+              - "arn:aws:s3:::serverless-guestbook/*"
+            Action:
+              - "s3:GetObject"
+
+  CustomResourcePopulateS3:
+    Type: "Custom::PopulateS3"
+    Version: 1.0
+    Properties:
+      ServiceToken: !GetAtt [ LambdaPopulateS3, Arn ]
+
+  LambdaPopulateS3:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      FunctionName: PopulateS3
+      Handler: index.handler
+      Role: !GetAtt [ LambdaFunctionRole, Arn ]
+      Runtime: nodejs4.3
+      Code:
+        ZipFile:
+          !Join
+            - ""
+            -
+              - "var awsSdk = require('aws-sdk'); \n"
+              - "var response = require('cfn-response'); \n"
+              - "exports.handler = function(event, context) { \n"
+              - "  var s3 = new awsSdk.S3() \n"
+              - "  var html = ` \n"
+              - "    <html> \n"
+              - "      <head> \n"
+              - "        <title>Serverless Guestbook</title> \n"
+              - "        <script type='text/javascript' src='https://code.jquery.com/jquery-3.1.1.min.js'></script> \n"
+              - "        <script type='text/javascript'> \n"
+              - "          const get_url   = '"
+              - !Join
+                - ""
+                -
+                  - "https://"
+                  - !Ref APIGateway
+                  - ".execute-api.ap-southeast-2.amazonaws.com/serverlessguestbookdeployment"
+              - "'\n"
+              - "          const post_url  = '"
+              - !Join
+                - ""
+                -
+                  - "https://"
+                  - !Ref APIGateway
+                  - ".execute-api.ap-southeast-2.amazonaws.com/serverlessguestbookdeployment"
+              - "'\n"
+              - "          const list_messages = (messages) => { for (m of messages) $('#list').append(format(m)) } \n"
+              - "          const format = (m) => '<li>' + m.message + '<br><small>posted by ' + m.author + ' on ' + m.date + '</small></li>' \n"
+              - "          const load_messages = () => $.get({ url: get_url }).then((messages) => list_messages(messages)) \n"
+              - "          const form_is_valid = () => $('#m').val().length > 0 && $('#a').val().length > 0 \n"
+              - "          const post_message = () => { \n"
+              - "            if (form_is_valid()) { \n"
+              - "              $('#list').empty() \n"
+              - "              $.post({ \n"
+              - "                url:  post_url, \n"
+              - "                data: { message: $('#m').val(), author: $('#a').val(), date: new Date().toISOString() } \n"
+              - "              }).then(() => load_messages()) \n"
+              - "            } else alert('Please type a message and the author name!') \n"
+              - "          } \n"
+              - "        </script> \n"
+              - "        <style> \n"
+              - "          li { margin-bottom: 1rem; } \n"
+              - "        </style> \n"
+              - "      </head> \n"
+              - "      <body onload='load_messages()'> \n"
+              - "        <hr> \n"
+              - "        <b>New message: </b> \n"
+              - "        <input id='m' placeholder='e.g. Hallo, world!'> \n"
+              - "        <b>by </b> \n"
+              - "        <input id='a' placeholder='e.g. John Doe'> \n"
+              - "        <button onclick='post_message()'>Post</button> \n"
+              - "        <hr> \n"
+              - "        <ul id='list'></ul> \n"
+              - "        <hr> \n"
+              - "      </body> \n"
+              - "    </html> \n"
+              - "  ` \n"
+              - "  var params = { \n"
+              - "    Body: html, \n"
+              - "    Bucket: 'serverless-guestbook', \n"
+              - "    Key: 'index.html', \n"
+              - "    ContentType: 'text/html', \n"
+              - "    ContentLanguage: 'html' \n"
+              - "  } \n"
+              - "  s3.putObject(params, function(err, data) { \n"
+              - "    if (err) response.send(event, context, response.FAILURE, data) \n"
+              - "    else     response.send(event, context, response.SUCCESS, data) \n"
+              - "  }) \n"
+              - "} \n"
+
+  DB:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      TableName: Messages
+      AttributeDefinitions:
+        - AttributeName: MessageID
+          AttributeType: S
+      KeySchema:
+        - AttributeName: MessageID
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+
+  LambdaGet:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      FunctionName: GetMessages
+      Handler: index.handler
+      Role: !GetAtt [ LambdaFunctionRole, Arn ]
+      Runtime: python2.7
+      Code:
+        ZipFile: >
+          import boto3
+
+          def handler(event, context):
+              messages = []
+              db_client = boto3.client('dynamodb')
+              items = db_client.scan(TableName='Messages', Select='ALL_ATTRIBUTES')['Items']
+              for item in items:
+                  messages.append({
+                      'message': item['Message']['S'],
+                      'author': item['Author']['S'],
+                      'date': item['Date']['S']
+                  })
+              return sorted(messages, key=lambda msg: msg['date'], reverse=True)
+
+  LambdaFunctionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: "sts:AssumeRole"
+            Principal:
+              Service: lambda.amazonaws.com
+            Effect: Allow
+      Policies:
+        - PolicyName: Policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Resource: "arn:aws:logs:*:*:*"
+                Action:
+                  - "logs:*"
+              - Effect: Allow
+                Resource: "*"
+                Action:
+                  - "lambda:InvokeFunction"
+              - Effect: Allow
+                Resource: "*"
+                Action:
+                  - "dynamodb:*"
+              - Effect: Allow
+                Resource: "*"
+                Action:
+                  - "s3:*"
+
+  APIGateway:
+    Type: "AWS::ApiGateway::RestApi"
+    Properties:
+      Name: serverless-guestbook-gateway
+
+  APIGatewayRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Action: [ "sts:AssumeRole" ]
+            Effect: Allow
+            Principal:
+              Service: [ "apigateway.amazonaws.com" ]
+      Path: "/"
+      Policies:
+        - PolicyName: PermitLambdaAndLog
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [ "lambda:InvokeFunction" ]
+                Resource: [ "*" ]
+              - Effect: Allow
+                Action: [ "logs:*" ]
+                Resource: "arn:aws:logs:*:*:*"
+              - Effect: Allow
+                Resource: "*"
+                Action: [ "dynamodb:*" ]
+
+  GetMessagesREST:
+    Type: "AWS::ApiGateway::Method"
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        Credentials: !GetAtt [ APIGatewayRole, Arn ]
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        Type: AWS
+        PassthroughBehavior: WHEN_NO_MATCH
+        Uri:
+          !Join
+            - ""
+            -
+              - "arn:aws:apigateway:ap-southeast-2:lambda:path/2015-03-31/functions/"
+              - !GetAtt [ LambdaGet, Arn ]
+              - "/invocations"
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+      ResourceId: !GetAtt [ APIGateway, "RootResourceId" ]
+      RestApiId: !Ref APIGateway
+
+  APIDeployment:
+    Type: "AWS::ApiGateway::Deployment"
+    DependsOn: GetMessagesREST
+    Properties:
+      RestApiId: !Ref APIGateway
+      StageName: serverlessguestbookdeployment
+
+  APIStage:
+    Type: "AWS::ApiGateway::Stage"
+    Properties:
+      DeploymentId: !Ref APIDeployment
+      RestApiId: !Ref APIGateway
+      StageName: serverlessguestbook
+
+  APIAccount:
+    Type: "AWS::ApiGateway::Account"
+    Properties:
+      CloudWatchRoleArn: !GetAtt [ CloudWatchRole, Arn ]
+
+  CloudWatchRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+       Version: "2012-10-17"
+       Statement:
+        - Effect: Allow
+          Principal:
+           Service:
+            - "apigateway.amazonaws.com"
+          Action: "sts:AssumeRole"
+      Path: "/"
+      ManagedPolicyArns:
+       - "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
